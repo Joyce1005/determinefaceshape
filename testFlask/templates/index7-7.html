@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <title>能「顏」善「辨」—— 臉型智能診斷與推薦系統</title>
+    <style>
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 20px 0;
+            position: relative;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .dot {
+            width: 14px;
+            height: 14px;
+            background-color: yellow;
+            border-radius: 50%;
+            position: absolute;
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+            cursor: pointer;
+        }
+
+        .result-box {
+            font-size: 18px;
+            font-weight: 400;
+            color: #333;
+            padding: 10px;
+            background-color: #f0f9ff;
+            border-left: 5px solid #4caf50;
+            border-radius: 5px;
+            margin: 20px 0;
+            display: none;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .result-box .highlight {
+            font-weight: bold;
+            color: #ff5722;
+        }
+
+        .imageContainer {
+            margin-left: 0px;
+            padding-left: 0px;
+        }
+    </style>
+</head>
+
+<body class="bg-body-tertiary">
+    <!-- .navbar-expand-{sm|md|lg|xl}決定在哪個斷點以上就出現漢堡式選單 -->
+    <!-- navbar-dark 文字顏色 .bg-dark 背景顏色 -->
+    <nav class="navbar navbar-expand-sm navbar-dark bg-dark sticky-top shadow-sm">
+        <!--mx, my調nav大小-->
+        <div class="container-fluid my-1 mx-lg-5">
+            <a class="navbar-brand d-flex align-items-center" href="/index">
+                <?xml version="1.0" encoding="UTF-8"?><svg class="mx-2 mx-md-4" width="30px" height="30px"
+                    stroke-width="1.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+                    color="#ffffff">
+                    <path d="M7 3H5C3.89543 3 3 3.89543 3 5V7" stroke="#ffffff" stroke-width="1.5"
+                        stroke-linecap="round" stroke-linejoin="round"></path>
+                    <path d="M17 3H19C20.1046 3 21 3.89543 21 5V7" stroke="#ffffff" stroke-width="1.5"
+                        stroke-linecap="round" stroke-linejoin="round"></path>
+                    <path d="M16 8L16 10" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"
+                        stroke-linejoin="round"></path>
+                    <path d="M8 8L8 10" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"
+                        stroke-linejoin="round"></path>
+                    <path d="M9 16C9 16 10 17 12 17C14 17 15 16 15 16" stroke="#ffffff" stroke-width="1.5"
+                        stroke-linecap="round" stroke-linejoin="round"></path>
+                    <path d="M12 8L12 13L11 13" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"
+                        stroke-linejoin="round"></path>
+                    <path d="M7 21H5C3.89543 21 3 20.1046 3 19V17" stroke="#ffffff" stroke-width="1.5"
+                        stroke-linecap="round" stroke-linejoin="round"></path>
+                    <path d="M17 21H19C20.1046 21 21 20.1046 21 19V17" stroke="#ffffff" stroke-width="1.5"
+                        stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>能「顏」善「辨」
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarTogglerDemo01"
+                aria-controls="navbarTogglerDemo01" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarTogglerDemo01">
+
+
+                <!-- me-auto：向左靠，ms-auto：向右靠 -->
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+                    <!-- me-3：Home和判斷臉型的距離-->
+                    <li class="nav-item me-3">
+                        <!-- active, aria-current="page"表示當前頁面 -->
+                        <a class="nav-link active" aria-current="page" href="/">判斷臉型</a>
+                    </li>
+                    <li class="nav-item me-3">
+                        <a class="nav-link" href="#">臉型介紹</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <main class="container">
+        <div class="px-4 px-md-5 py-4 my-4 bg-body rounded shadow-sm">
+            <h1 class="text-secondary mb-4 fw-bold">判斷臉型</h1>
+            <p class="mb-4">點擊選擇檔案或拍照</p>
+
+
+            <!-- 按鈕容器，包含上傳圖片與拍照按鈕 -->
+            <div class="d-flex mb-4 row ">
+                <!-- 上傳圖片的表單 -->
+                <div class="col-9 col-md-4 mb-2">
+                    <form id="uploadForm" enctype="multipart/form-data" class="me-0">
+                        <input type="file" id="imageInput" name="image" accept="image/*" class="form-control" required>
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    </form>
+                </div>
+
+                <div class="col-3 col-md-auto mb-2">
+                    <!-- 拍照按鈕 -->
+                    <button id="takePhotoButton" class="btn btn-primary">拍照</button>
+                </div>
+
+            </div>
+
+            <!--圖片容器+說明圖片-->
+            <div class="row mx-3">
+                <!-- 圖片容器 -->
+                <div id="imageContainer" class="col-md position-relative order-2 order-md-1"
+                    style="padding-left: 0px;padding-top: 0px;">
+                </div>
+                <div id="infoContainer" class="col-md text-center text-md-start order-1 order-md-2"
+                    style="display: none;">
+                    <p>(如下圖指示，拖引標點至對應位置)</p>
+                    <img src="{{ url_for('static', filename='info3.jpg') }}" alt="Info Image"
+                        class="img-fluid d-block mx-md-0 mx-auto" style="max-width: 100%; width: 350px;">
+                </div>
+            </div>
+
+
+            <!-- 確認按鈕 -->
+            <button id="confirmButton" class="btn btn-success mt-4" style="display: none;">確認選擇</button>
+
+            <!-- 顯示座標 -->
+            <p id="coords" class="mt-3" style="display:none;"></p>
+
+
+            <!-- 顯示臉型結果 -->
+            <p id="faceshapeResult" class="result-box"></p>
+
+            <!--進度條-->
+            <div class="progress mt-4" style="display:none;">
+                <div id="uploadProgress" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0"
+                    aria-valuemin="0" aria-valuemax="100">0%</div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        const form = document.getElementById('uploadForm');
+        const imageContainer = document.getElementById('imageContainer');
+        const coordsDisplay = document.getElementById('coords');
+        const faceshapeResult = document.getElementById('faceshapeResult');
+        const confirmButton = document.getElementById('confirmButton');
+        const infoContainer = document.getElementById('infoContainer');
+        let points = [];
+        let activePoint = null;
+        let ratio;
+        const scrolltoBottom = () => {
+            var lastChild = faceshapeResult.lastElementChild;
+            lastChild.scrollIntoView({ behavior: "smooth" });
+        };
+
+        const takePhotoButton = document.getElementById('takePhotoButton');
+        takePhotoButton.addEventListener('click', () => {
+            localStorage.clear();
+            window.location.href = "/take_photo";
+        });
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]');
+
+        const imageInput = document.getElementById('imageInput');
+        imageInput.addEventListener('change', async () => {
+            if (imageInput.files.length > 0) {
+                const formData = new FormData(form);
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-Token': csrfToken.getAttribute('content')
+                    },
+                    body: formData
+                });
+
+                const data = await response.json();
+                const imagePath = data.image_path;
+                filePath = data.filepath;
+                forehead = data.forehead;
+                console.log(forehead);
+
+                faceshapeResult.style.display = 'none';
+                infoContainer.style.display = 'block';
+
+                const img = document.createElement('img');
+                img.src = imagePath;
+                img.id = "uploadedImage";
+                img.addEventListener('dragstart', (event) => event.preventDefault());
+                img.addEventListener('selectstart', (event) => event.preventDefault());
+                imageContainer.innerHTML = '';
+                imageContainer.appendChild(img);
+
+                const uploadedImage = document.getElementById('uploadedImage');
+                uploadedImage.style.margin = '0px';
+                uploadedImage.style.minWidth = '250px';
+                img.onload = function () {
+                    console.log("寬：", img.clientWidth, " 高：", img.clientHeight);
+                    var originalWidth = img.naturalWidth;
+                    var originalHeight = img.naturalHeight;
+                    console.log("圖片原始寬度：" + originalWidth + "px");
+                    console.log("圖片原始高度：" + originalHeight + "px");
+                    console.log(originalHeight / img.clientHeight, originalWidth / img.clientWidth);
+                    ratio = img.clientHeight / img.naturalHeight;
+                    setupDraggablePoints(forehead, ratio);
+                };
+
+                coordsDisplay.textContent = '';
+                confirmButton.style.display = 'block';
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const imagePath = localStorage.getItem('capturedImagePath');
+            if (imagePath) {
+                imageContainer.innerHTML = '';
+                faceshapeResult.style.display = 'none';
+                infoContainer.style.display = 'block';
+                try {
+                    const response = await fetch(imagePath);
+                    const blob = await response.blob();
+
+                    const formData = new FormData();
+                    formData.append('image', blob, 'uploadedImage.jpg');
+
+                    const uploadResponse = await fetch('/upload', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-Token': csrfToken.getAttribute('content')
+                        },
+                        body: formData
+                    });
+
+                    const data = await uploadResponse.json();
+                    let image_Path = data.image_path;
+                    filePath = data.filepath;
+                    forehead = data.forehead;
+
+                    imageContainer.innerHTML = '';
+                    const newImg = document.createElement('img');
+                    newImg.src = image_Path + "?t=" + new Date().getTime();
+                    newImg.id = "uploadedImage";
+                    imageContainer.appendChild(newImg);
+                    const uploadedImage = document.getElementById('uploadedImage');
+                    uploadedImage.style.margin = '0px';
+                    uploadedImage.style.minWidth = '250px';
+                    uploadedImage.style.minWidth = '250px';
+
+                    // 等待圖片加載完成後，獲取尺寸
+                    uploadedImage.onload = function () {
+                        // 獲取圖片原始尺寸
+                        const originalWidth = uploadedImage.naturalWidth;
+                        const originalHeight = uploadedImage.naturalHeight;
+
+                        // 獲取圖片顯示在網頁上的尺寸
+                        const displayedWidth = uploadedImage.clientWidth;
+                        const displayedHeight = uploadedImage.clientHeight;
+
+                        console.log("原始寬度：" + originalWidth + "px");
+                        console.log("原始高度：" + originalHeight + "px");
+                        console.log("顯示寬度：" + displayedWidth + "px");
+                        console.log("顯示高度：" + displayedHeight + "px");
+                        ratio = displayedHeight / originalHeight;
+                        console.log(ratio);
+
+                        localStorage.removeItem('capturedImagePath');
+                        localStorage.clear();
+
+                        setupDraggablePoints(forehead, ratio);
+                    };
+
+                } catch (error) {
+                    console.error('Error uploading image:', error);
+                }
+            }
+        });
+
+        function setupDraggablePoints(forehead, ratio) {
+            points = [];
+
+            for (let i = 0; i < 3; i++) {
+                const point = document.createElement('div');
+                point.className = 'dot';
+
+                imageContainer.appendChild(point);
+
+                const offsetX = point.offsetWidth / 2;
+                const offsetY = point.offsetHeight / 2;
+
+                point.style.left = `${forehead[i][0] * ratio - offsetX}px`;
+                point.style.top = `${forehead[i][1] * ratio - offsetY}px`;
+
+                point.setAttribute('data-index', i);
+                points.push(point);
+
+                // 支援滑鼠拖拉
+                point.addEventListener('mousedown', startDrag);
+                // 支援觸控拖拉
+                point.addEventListener('touchstart', startTouchDrag);
+            }
+
+            confirmButton.style.display = 'block';
+
+            // 滑鼠事件
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', endDrag);
+            // 觸控事件
+            document.addEventListener('touchmove', touchDrag);
+            document.addEventListener('touchend', endDrag);
+        }
+
+        function startDrag(event) {
+            event.preventDefault();
+            activePoint = event.target;
+        }
+
+        // 觸控啟動拖拉
+        function startTouchDrag(event) {
+            event.preventDefault();
+            activePoint = event.target;
+        }
+
+        function drag(event) {
+            event.preventDefault();
+            if (activePoint) {
+                const rect = imageContainer.getBoundingClientRect();
+                const newX = event.clientX - rect.left - activePoint.offsetWidth / 2;
+                const newY = event.clientY - rect.top - activePoint.offsetHeight / 2;
+
+                activePoint.style.left = `${newX}px`;
+                activePoint.style.top = `${newY}px`;
+            }
+        }
+
+        // 觸控拖拉
+        function touchDrag(event) {
+            if (activePoint) {
+                const rect = imageContainer.getBoundingClientRect();
+                const touch = event.touches[0]; // 取得第一個觸控點
+                const newX = touch.clientX - rect.left - activePoint.offsetWidth / 2;
+                const newY = touch.clientY - rect.top - activePoint.offsetHeight / 2;
+
+                activePoint.style.left = `${newX}px`;
+                activePoint.style.top = `${newY}px`;
+            }
+        }
+
+        function endDrag() {
+            activePoint = null;
+            updateCoords();
+        }
+
+        function updateCoords() {
+            const currentCoords = points.map(point => ({
+                x: (parseInt(point.style.left) / ratio + point.offsetWidth / 2),
+                y: (parseInt(point.style.top) / ratio + point.offsetHeight / 2)
+            }));
+            console.log("ratio: ", ratio);
+
+            confirmButton.style.display = 'block';
+
+            coordsDisplay.textContent = `點擊座標: ${JSON.stringify(currentCoords)}`;
+        }
+
+        confirmButton.addEventListener('click', () => {
+
+
+            const img = document.getElementById('uploadedImage');
+            const imagePath = img.src;
+            const coords = points.map(point => ({
+                x: (parseInt(point.style.left) / ratio + point.offsetWidth / 2),
+                y: (parseInt(point.style.top) / ratio + point.offsetHeight / 2)
+            }));
+
+            confirmButton.style.display = 'none';
+
+            // 顯示進度條並設置為 0%
+            const progressBar = document.getElementById('uploadProgress');
+            document.querySelector('.progress').style.display = 'block';
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/coords', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.setRequestHeader('X-CSRF-Token', csrfToken.getAttribute('content'));
+
+            // 更新進度條
+            xhr.upload.onprogress = function (event) {
+                if (event.lengthComputable) {
+                    const percentComplete = (event.loaded / event.total) * 100;
+                    progressBar.style.width = `${percentComplete}%`;
+                    progressBar.textContent = `${Math.round(percentComplete)}%`;
+                }
+            };
+
+            // 成功完成後的處理
+            xhr.onload = function () {
+                if (xhr.status === 200) {
+                    const data = JSON.parse(xhr.responseText);
+                    if (data.status === 'success') {
+                        let resultText = `根據判斷，您的<span class="highlight">${data.maxLenth}</span> >= <span class="highlight">${data.midLenth}</span> >= <span class="highlight">${data.minLenth}</span><br/>下巴：<span class="highlight">${data.jaw}</span><br/>面部長寬比：`;
+                        if (data.goldenFace >= 2) {
+                            resultText += `<span class="highlight">不</span>`;
+                        }
+                        resultText += `<span class="highlight">明顯</span><br/>`;
+
+                        resultText += `眼距：`;
+                        if (data.disOfEyes == -1) {
+                            resultText += `<span class="highlight">略窄</span><br/><br/>`;
+                        }
+                        else if (data.disOfEyes == 0) {
+                            resultText += `<span class="highlight">黃金比例</span><br/><br/>`;
+                        }
+                        else {
+                            resultText += `<span class="highlight">略寬</span><br/><br/>`;
+                        }
+
+                        resultText += `※臉型：<span class="highlight">${data.faceshape}</span><br>`;
+                        if (data.goldenFace == 2) {
+                            resultText += ` 您的臉型之長寬比為<span class="highlight">黃金比例</span>！`;
+                        }
+                        faceshapeResult.innerHTML = resultText;
+                        faceshapeResult.style.display = 'block';
+                        scrolltoBottom();
+                    } else {
+                        console.error('Error processing coordinates:', data.message);
+                    }
+                } else {
+                    console.error('Error:', xhr.statusText);
+                }
+
+                // 隱藏進度條
+                document.querySelector('.progress').style.display = 'none';
+                progressBar.style.width = '0%';
+                progressBar.textContent = '0%';
+            };
+
+            xhr.onerror = function () {
+                console.error('Error:', xhr.statusText);
+                // 隱藏進度條
+                document.querySelector('.progress').style.display = 'none';
+                progressBar.style.width = '0%';
+                progressBar.textContent = '0%';
+            };
+
+            const payload = JSON.stringify({
+                coords: coords,
+                image_path: imagePath,
+                filepath: filePath
+            });
+
+            xhr.send(payload);
+        });
+
+    </script>
+</body>
+
+</html>
